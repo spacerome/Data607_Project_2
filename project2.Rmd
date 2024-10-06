@@ -1,0 +1,43 @@
+---
+title: "Data607 - Project 2: Data Transformation with Astronomical Data"
+author: "Anthony Josue Roman"
+date: "2024-10-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(readr)
+library(RCurl)
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+```
+
+This assignment will use the following packages:
+
+```{r eval=FALSE}
+library(readr)
+library(RCurl)
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+```
+
+## Introduction
+
+The following project will utilize three datasets I have obtained from either simulation or from the Sloan Digital Sky survey data (fun fact my mentor worked on this sky survey data - Donald P Schneider). The first dataset will be exoplanet dataset from [Sloan Digital Sky Survey](https://exoplanetarchive.ipac.caltech.edu/cgi-bin/TblView/nph-tblView?app=ExoTbls&config=PS), the second dataset will be from [Gaia Archeive](https://gea.esac.esa.int/archive/) for Stellar Evolution, and the last one will be from [EZ-Webb](http://user.astro.wisc.edu/~townsend/static.php?ref=ez-web#toc-Submit_a_Calculation) where I used **three** different calculations from 3 different stellar masses with the same Metallicity.
+
+## Initializing datasets
+
