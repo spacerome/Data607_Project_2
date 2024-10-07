@@ -37,7 +37,296 @@ library(kableExtra)
 
 ## Introduction
 
-The following project will utilize three datasets I have obtained from either simulation or from the Sloan Digital Sky survey data (fun fact my mentor worked on this sky survey data - Donald P Schneider). The first dataset will be exoplanet dataset from [Sloan Digital Sky Survey](https://exoplanetarchive.ipac.caltech.edu/cgi-bin/TblView/nph-tblView?app=ExoTbls&config=PS), the second dataset will be from [Gaia Archeive](https://gea.esac.esa.int/archive/) for Stellar Evolution, and the last one will be from [EZ-Webb](http://user.astro.wisc.edu/~townsend/static.php?ref=ez-web#toc-Submit_a_Calculation) where I used **three** different calculations from 3 different stellar masses with the same Metallicity.
+Astronomy has played a key role in advancement of human civilization and to understand our universe. Exoplanets, planets not apart of our system, have been an interest of astronomers for centuries, which may indicate potential possibilities of extraterrestrial life. Gaia, which was launched earlier plays a key role in advancements in Astronomy as it is used to analyze the stars of our universe and for other Astronomy missions.
+
+The following project will utilize three datasets I have obtained from the Sloan Digital Sky survey data and Gaia. The first dataset will be exoplanet dataset from [Sloan Digital Sky Survey](https://exoplanetarchive.ipac.caltech.edu/cgi-bin/TblView/nph-tblView?app=ExoTbls&config=PS), the second and third dataset will be from [Gaia Archive](https://gea.esac.esa.int/archive/). 
 
 ## Initializing datasets
 
+The following datasets are extracted from my [Github Page](https://github.com/spacerome/Data607_Project_2). This will convert them into data frames.
+
+```{r initializations}
+
+rawgaia <- getURL("https://raw.githubusercontent.com/spacerome/Data607_Project_2/refs/heads/main/gaiadata.csv")
+
+rawgaia2 <- getURL("https://raw.githubusercontent.com/spacerome/Data607_Project_2/refs/heads/main/gaiadata2.csv")
+
+rawsds <- getURL("https://raw.githubusercontent.com/spacerome/Data607_Project_2/refs/heads/main/PS_2024.10.06_14.59.24.csv")
+
+gaiadf <- data.frame(read.csv(text=rawgaia, sep= "\t", stringsAsFactors = FALSE, check.names = FALSE))
+
+gaiadf2 <- data.frame(read.csv(text=rawgaia2, sep= "\t", stringsAsFactors = FALSE, check.names = FALSE))
+
+sdsdf <- data.frame(read.csv(text=rawsds, sep= "\t", stringsAsFactors = FALSE, check.names = FALSE))
+
+```
+
+## Tidying the Data: Gaia Data Frames
+
+This code block will tidy the following dataset from `gaiadf` and `gaiadf2` respectively:
+
+```{r tidyingdata gaiadf}
+gaiadf_tidy <- gaiadf %>%
+  pivot_longer(
+    cols = -SOURCE_ID, 
+    names_to = c("measurement_type", "band", "replicate"),
+    names_pattern = "(\\w+)_(\\w+)_(\\d)", 
+    values_to = "value"
+  ) %>%
+  filter(!is.na(value))
+
+head(gaiadf_tidy)
+```
+```{r tidyingdata gaiadf2}
+gaiadf2_tidy <- gaiadf2 %>%
+  pivot_longer(
+    cols = -source_id, 
+    names_to = "attribute", 
+    values_to = "value"     
+  ) %>%
+  filter(!is.na(value)) 
+
+head(gaiadf2_tidy)
+```
+
+### Analysis of Data
+
+We will analyze the data from `gaiadf_tidy` first then will analyze `gaiadf2_tidy`.
+
+This will basically calculate the summary statistics for each measurement such as dec (declination), ra (right ascension), magnitude, parallax for each band `rp`, `bp`, and `g`. The bands are defined as `bp` is Blue Photometer, `g` is Gaia's main photometric band, and `rp` is the Red Photometer.
+
+```{r Measurement Type and Band gdftidy}
+gaiadf_tidy %>%
+  group_by(measurement_type, band) %>%
+  summarize(
+    mean_value = mean(as.numeric(value), na.rm = TRUE),
+    sd_value = sd(as.numeric(value), na.rm = TRUE),
+    min_value = min(as.numeric(value), na.rm = TRUE),
+    max_value = max(as.numeric(value), na.rm = TRUE),
+    count = n()
+  ) %>%
+  arrange(measurement_type, band)
+```
+
+**Findings:** From this we can tell the mean declination value is consistent across the all three bands, with a mean of approximately `-66.2` and a standard deviation of about `2.69`. The Magnitude values slightly differ across the bands, with `bp` having the tightest mean magnitude of `19.2`, followed by `g` with a mean magnitude of `18.5`, and `rp` has a mean magnitude of `17.7`. This is expected as the Blue Photometer band is usually more sensitive to fainter objects. The mean parallax value is `1.01` for all bands, which indicates that the stars in `gaiadf_tidy` have similar parallax values. The high standard deviation of `1.39` means that there are a broad range of distances which is expected. Lastly, for right ascension is consistent across all bansds with a mean of `58.1`, and a high standard deviation of `9.8` suggests a wider spread of values.
+
+
+```{r gdftidyhistogram}
+ggplot(gaiadf_tidy, aes(x = band, y = as.numeric(value), fill = band)) +
+  geom_boxplot() +
+  facet_wrap(~ measurement_type, scales = "free_y") +
+  labs(title = "Distribution of Measurements by Band and Type",
+       y = "Value", x = "Band") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+**Findings:** For the declination, the distribution for the mean declination value is around `-66` for all three bands. The spread and whiskers are similar across all bands, indicating that the declination measurements are consistent across the different bands. For the magnitude, the values vary slightly across the bands, with `rp` having a slightly lower of about `17.7`, and the `g` band is about `18.5`. The spread is wider in the `rp` band compared to `bp` and `g`. The `rp` band also shows more outliers, which indicates a broader range of brightness levels for stars in the red band. For the parallax, the distribution is very tight and near zero for all bands, which means most of the stars are far away and have very small parallax values (hence parallax's limitations). The spread of the box is minimal which shows that means that most of the stars have a similar parallax value. Analyzing the right ascension from the values indicates that values for `ra` are distributed more widely across all three bands and centered around `58`. There is a larger spread of `ra` values where `g` band shows a slightly wider distribution compared to the `bp` and `rp` bands.
+
+
+### Analyzing the Second Gaia Data Set
+
+```{r gdf2tidy}
+gaiadf2_tidy %>%
+  group_by(attribute) %>%
+  summarize(
+    mean_value = mean(as.numeric(value), na.rm = TRUE),
+    sd_value = sd(as.numeric(value), na.rm = TRUE),
+    min_value = min(as.numeric(value), na.rm = TRUE),
+    max_value = max(as.numeric(value), na.rm = TRUE),
+    count = n()
+  ) %>%
+  arrange(attribute)
+```
+
+**Findings:** The Positional Attributes of Right Ascension and Declination show that `ra` ranges from `0.398` to `360` degrees, which covers the entire sky, and also means `gaiadf2_tidy` covers the full range of the celestial sphere, and `dec` ranges from `-83.7` to `87.0` degrees, which shows that the stars in `gaiadf2_tidy` spread across both hemispheres, which covers a broad range of the sky, with an average value close to zero, a mean of `-3.43`. This data suggests that there is a nearly even distribution of stars above and below the celestial equator. The Magnitude for the `bp` band has a mean of `4.4` and a slightly higher standard deviation of `0.707`, which indicates a moderate range of brightness values in this band. The `g` band has a mean magnitude of `3.8` which has a standard deviation of `0.534` and indicates that most of the stars are consistently bright in the `g` band. The `rp` band has a mean magnitude of `3.28` which indicates that the stars appear brightest in the red band on average. The standard deviation of the `rp` band is `0.610` which indicates a wider spread of brightness in the `rp` band. The difference in mean magnitudes is expected as the sensitivity varies within the three bands (you will see a lot of this in observational astronomy and in astronomical data). Also stars are fainter in the `bp` band and brighter in the `rp` band, since the `bp` band is more sensitive to bluer light, and this is emitted less by most stars compared to redder light, and also since the universe is expanding light tends to become more red-shifted as the distance increases. To explain the proper motion values, the mean of `pmra`, which is `5.69`, and the `pmdec` is `-27.1`, this suggests there is a slight bias in motion towards the west and towards the south. This may indicate a systemic trend in this data, where the distribution of the stars' velocities are relative to the Earth's motion. The parallax values indicate a mean parallax of `18.3` which if you want to calculate the distance (`1/parallax`) you will get `0.055` parsecs (0.18 light years) which indicates very close stars. The standard deviation is quite large which is `26.1` and the range of parallax values is `0.119` to `311`, which shows that the stars vary at different distances, and the high parallax values indicates that there is a presence of very nearby stars, which are potentially within our solar neighborhood.
+
+```{r gdf2hist}
+ggplot(gaiadf2_tidy, aes(x = as.numeric(value), fill = attribute)) +
+  geom_histogram(binwidth = 0.5, color = "black", alpha = 0.6) +
+  facet_wrap(~ attribute, scales = "free") +
+  labs(title = "Histogram of Attributes in gaiadf2_tidy",
+       x = "Value", y = "Frequency") +
+  theme_minimal()  +
+  theme(
+    plot.title = element_text(hjust = 0.5))
+```
+
+**Findings:** To summarize this, the `dec` part suggests the distribution is relatively uniform as mentioned before. This suggests that the stars are evenly distributed across the northern and southern hemispheres. The `ra` is uniformly distributed across the entire range of `0` to `360` degrees, which confirms that the stars are spread evenly across the sky in `ra`. The mean magnitudes are showing near-normal distributions and as mentioned previously it supports the explanation that `rp` has the brightest stars. The parallax is highly right-skewed with most values clustered near zero and a few extreme values up to `300`. This indicates most stars are far away, and very few close stars having high parallax values. The Proper motion (`pmra` and `pmdec`) show it is right-skewed with large tails, which indicates a few stars with very high proper motion, and the peaks near zero suggests that most stars have a low proper motion, **but** there are significant outliers.
+
+```{r gdf2ppm}
+# Scatter plot of Proper Motion in RA vs Dec
+gaiadf2_pm <- gaiadf2_tidy %>%
+  filter(attribute %in% c("pmra", "pmdec")) %>%
+  pivot_wider(names_from = attribute, values_from = value)
+
+ggplot(gaiadf2_pm, aes(x = as.numeric(pmra), y = as.numeric(pmdec))) +
+  geom_point(alpha = 0.6, color = "red") +
+  labs(title = "Proper Motion: PMRA vs PMDEC",
+       x = "Proper Motion in RA", y = "Proper Motion in Dec") +
+  theme_minimal()  +
+  theme(
+    plot.title = element_text(hjust = 0.5))
+```
+
+**Findings:** There is a cluster around the origin of `(0,0)` for `pmra` and `pmdec` which indicates that most stars have a relatively low proper motion in both directions. This is mostly because most of the stars in the sky are moving very slowly relatively to the position of our planet (can go into further detail if needed). There are outliers here where stars are scattered far away from the central cluster, which indicates very high proper motion values in either the right ascension, declination, or both. These outliers can represent stars that are moving rapidly across the sky, which may be nearby high-velocity stars, or binary systems.
+
+```{r gdf2pm}
+parallax_magnitude <- gaiadf2_tidy %>%
+  filter(attribute %in% c("parallax", "phot_g_mean_mag")) %>%
+  pivot_wider(names_from = attribute, values_from = value)
+
+ggplot(parallax_magnitude, aes(x = as.numeric(parallax), y = as.numeric(phot_g_mean_mag))) +
+  geom_point(color = "purple", alpha = 0.6) +
+  labs(title = "Parallax vs G-band Magnitude",
+       x = "Parallax", y = "G-band Magnitude") +
+  theme_minimal()  +
+  theme(
+    plot.title = element_text(hjust = 0.5))
+```
+
+**Findings:** This scatterplot where it compares the parallax of stars vs the G-Band Magnitude indicates that most of the stars are distant (low parallax) as they are mostly clustered close to zero, and have similar magnitudes in the g-band. There are a few closer stars (high parallax) that appear much brighter. This pattern is consistent with the explanation that stars become fainter with increasing distance.
+
+### Writing Gaia Data into CSV
+
+To write this data into a csv for reproducibility the file will be exported here:
+
+```{r gaiacsv}
+write.csv(gaiadf_tidy, "gaiadf_tidy_analysis.csv", row.names = FALSE)
+write.csv(gaiadf2_tidy, "gaiadf2_tidy_analysis.csv", row.names = FALSE)
+```
+
+## Sloan Digital Sky Survey Data
+
+### Tidying the Dataset
+
+Similar to with the gaia datasets we will tidy the Sloan Digital Sky survey data into tidy format.
+
+```{r sdstidy}
+id_columns <- c("pl_name", "hostname", "discoverymethod", "disc_year", "soltype", "pl_controv_flag", "disc_facility")
+
+sdsdf_filtered <- sdsdf %>%
+  select(all_of(id_columns), starts_with("sy_"))
+
+sdsdf_tidy <- sdsdf_filtered %>%
+  pivot_longer(
+    cols = starts_with("sy_"),
+    names_to = c("type", ".value"),
+    names_sep = "_",
+    values_drop_na = TRUE
+  )
+
+sdsdf_tidy <- sdsdf_tidy %>%
+  filter(!is.na(vmag) & !is.na(kmag) & !is.na(gaiamag))
+```
+
+### Analysis of the Sloan Digital Sky Survey Dataset
+
+We will begin analyzing the dataset with the following code blocks:
+
+```{r sdatidyanalysis1}
+sdsdf_tidy %>%
+  group_by(type) %>%
+  summarise(
+    mean_vmag = mean(vmag, na.rm = TRUE),
+    median_vmag = median(vmag, na.rm = TRUE),
+    sd_vmag = sd(vmag, na.rm = TRUE),
+    mean_kmag = mean(kmag, na.rm = TRUE),
+    median_kmag = median(kmag, na.rm = TRUE),
+    sd_kmag = sd(kmag, na.rm = TRUE),
+    mean_gaiamag = mean(gaiamag, na.rm = TRUE),
+    median_gaiamag = median(gaiamag, na.rm = TRUE),
+    sd_gaiamag = sd(gaiamag, na.rm = TRUE)
+  ) %>%
+  mutate(
+    percent_mean_vmag = mean_vmag / sum(mean_vmag, na.rm = TRUE) * 100,
+    percent_mean_kmag = mean_kmag / sum(mean_kmag, na.rm = TRUE) * 100,
+    percent_mean_gaiamag = mean_gaiamag / sum(mean_gaiamag, na.rm = TRUE) * 100
+  )
+
+```
+
+```{r sdatidyanalysis2}
+sdsdf_tidy %>%
+  count(type) %>%
+  mutate(percent = n / sum(n) * 100)
+
+```
+
+```{r sdatagraph}
+ggplot(sdsdf_tidy, aes(x = vmag, fill = type)) +
+  geom_histogram(aes(y = ..count.. / sum(..count..) * 100), bins = 30, alpha = 0.6) +
+  facet_wrap(~ type) +
+  theme_minimal() +
+  labs(title = "Distribution of Visual Magnitude (Vmag) for Each Type", x = "Visual Magnitude", y = "Percentage (%)") +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+**Findings:** This states that most of the visual magnitudes range from 12-15, which suggests that `sdsdf_tidy` mainly contains fainter celestial objects. There is a significant drop for `Vmag` values less than 10, which indicates a limited number of brighter objects and the long tail indicates a frew extremely faint objects.
+
+```{r sdsstatsanalysis}
+ggplot(sdsdf_tidy, aes(x = vmag, y = gaiamag, color = type)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  labs(title = "Relationship between Visual Magnitude (Vmag) and Gaia Magnitude", x = "Visual Magnitude", y = "Gaia Magnitude") +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+**Findings:** From this relationship between the visual magnitude and the gaia magnitude, there is a high correlation between the `Vmag` and `Gaia Magnitude, where as the visual magnitude increases, the gaia magnitude also increases. Thus objects that are brighter in the visible spectrum tend to be brighter in the Gaia band.  
+
+```{r sdsgrouping}
+sdsdf_tidy %>%
+  group_by(discoverymethod) %>%
+  summarise(
+    n = n(),  # Count of observations
+    mean_vmag = mean(vmag, na.rm = TRUE),
+    sd_vmag = sd(vmag, na.rm = TRUE),
+    mean_kmag = mean(kmag, na.rm = TRUE),
+    sd_kmag = sd(kmag, na.rm = TRUE)
+  ) %>%
+  mutate(
+    percent_n = n / sum(n) * 100,  # Percentage of total count
+    percent_mean_vmag = mean_vmag / sum(mean_vmag) * 100,  
+    percent_mean_kmag = mean_kmag / sum(mean_kmag) * 100   
+  ) %>%
+  select(discoverymethod, n, percent_n, mean_vmag, percent_mean_vmag, mean_kmag, percent_mean_kmag)
+
+```
+
+**Findings:** From this analysis, this shows that the transit method is really dominant as it shows a large percentage of observations for detecting exoplanets where the percentage is `92.02%`. This is definitely expected since the transit method is one of the most effective techniques for detecting exoplanets when monitoring large numbers of stars. Pulsar Timing and Eclipse timing variations have high mean magnitudes, which indicates they are typically used to detect vary faint objects that are harder to observe. The imaging and radial velocity methods show relatively low mean magnitudes, which indicates that they are used to detect brighter objects.
+
+Lastly, I will make a time series of the discoveries over time for the exoplanets.
+
+```{r timeseries}
+sdsdf_tidy %>%
+  group_by(disc_year) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(x = disc_year, y = count)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Number of Discoveries Over Time", x = "Discovery Year", y = "Number of Discoveries") +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+This graph explains how prior to the 2000s there were very few discoveries before the year 2000, with the number of detections remaining low. From 2000 to 2010, there was an increase in the number of discoveries which were indications that there were improvements in detection technology and techniques in radial velocity and transit methods explained in [Gaia's website](https://sci.esa.int/web/exoplanets/-/60649-exoplanet-mission-timeline) and [NASA's interactive timeline](https://exoplanets.nasa.gov/alien-worlds/historic-timeline/). From 2010 to 2016, this had a large number of discoveries stemming from the large-scale survey missions from [NASA's Kepler Space Telescope](https://exoplanets.nasa.gov/alien-worlds/kepler-timeline/) which uses the transit method. There weas a decline after 2016, which may be from fewer missions, but an increase around 2018 where the launch of TESS was used to analyze exoplanets. COVID also may have been an impact on this time series as well, since this impacted numerous research projects. Overall, this should increase with the launch of [JWST](https://science.nasa.gov/mission/webb/) (James Webb Space Telescope) and PLATO (Planetary Transits and Oscillations of Stars) from [ESA](https://sci.esa.int/web/plato/) when it launches in 2025.
+
+### Exporting this file to CSV
+
+This exports the file into csv for reproductibility.
+
+```{r sdsfcsv}
+write.csv(sdsdf_tidy, "sdsdf_tidy.csv", row.names = FALSE)
+```
+
+## Conclusion
+
+With the analysis of the Gaia Datasets, it appears there may need to be further analysis on the anomalies where we may need to classify the stars by distances with respect to the parallax values. This will determine whether the brighter stars (lower magnitude) with high parallax values are part of known nearby stellar systems. We may need to examine unique stars with high parallax and high magnitude to determine whether or not these can be unique stars or errors. Lastly for the gaia datasets, with the concentration of stars at low parallax values may indicate the detection limit of Gaia's parallax measurements, where stars below a certain parallax threshold are difficult to measure accurately. To continue to investigate the outliers for proper motion with the Gaia datasets, we can analyze the high proper motion stars to check if they are using their parallax values and if they are close it may explain why their motion is rapid across the sky. Similar to the Gaia Datasets, with the Sloan Digital Sky surveys, further analysis may be needed to analyze the outliers to determine if there are any errors and to determine if any of the detections can be false positives which is common in exoplanet detections. 
